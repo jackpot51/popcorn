@@ -6,6 +6,9 @@ MICROSOFT="0"
 # Root device UUID
 ROOT_UUID="$(findmnt --noheadings --output UUID --mountpoint /)"
 
+# Linux command line
+CMDLINE="root=UUID=${ROOT_UUID} ro quiet loglevel=0 systemd.show_status=false splash"
+
 set -ex
 
 # Create keys
@@ -50,7 +53,7 @@ rm -rf build
 mkdir -p build
 
 # Create unified Linux EFI executable
-echo "root=UUID=${ROOT_UUID} ro quiet loglevel=0 systemd.show_status=false splash" > "build/cmdline"
+echo "${CMDLINE}" > "build/cmdline"
 sudo objcopy \
 	--add-section .osrel="/usr/lib/os-release" --change-section-vma .osrel=0x20000 \
     --add-section .cmdline="build/cmdline" --change-section-vma .cmdline=0x30000 \
