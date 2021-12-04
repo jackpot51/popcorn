@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 
 # Add Microsoft keys
-MICROSOFT="1"
+MICROSOFT="0"
 
 # Root device UUID
 ROOT_UUID="$(findmnt --noheadings --output UUID --mountpoint /)"
 
 set -ex
 
-# Create secretes
+# Create keys
 if [ ! -d secret ]
 then
+	sudo apt-get install -y efitools
+
 	rm -rf secret.partial
 	mkdir -p secret.partial
 	pushd secret.partial
@@ -39,22 +41,8 @@ then
 	cert-to-efi-sig-list -g "$(< GUID.txt)" db.crt db.esl
 	sign-efi-sig-list -g "$(< GUID.txt)" -k KEK.key -c KEK.crt db db.esl db.auth
 
-	# Create sbkeysync keystore
-	mkdir -p keystore/{PK,KEK,db}
-	cp PK.auth keystore/PK
-	cp KEK.auth keystore/KEK
-	cp db.auth keystore/db
-
 	popd
 	mv secret.partial secret
-fi
-
-# Optionally add Microsoft keys
-if [ "${MICROSOFT}" == "1" ]
-then
-	sign-efi-sig-list -a -g 77fa9abd-0359-4d32-bd60-28f4e78f784b -k secret/KEK.key -c secret/KEK.crt db data/MS_db.esl secret/keystore/db/MS_db.auth
-else
-	rm -f secret/keystore/db/MS_db.auth
 fi
 
 # Recreate build directory
@@ -76,18 +64,29 @@ sbsign --key secret/db.key --cert secret/db.crt --output build/linux-signed.efi 
 # Sign systemd-boot EFI executable
 sbsign --key secret/db.key --cert secret/db.crt --output build/systemd-boot-signed.efi /usr/lib/systemd/boot/efi/systemd-bootx64.efi
 
-# Sync secure boot keys: dry run for verification
-sbkeysync --keystore secret/keystore --verbose --dry-run
-sbkeysync --keystore secret/keystore --pk --verbose --dry-run
-
-# Sync secure boot keys
-sudo sbkeysync --keystore secret/keystore --verbose
-sudo sbkeysync --keystore secret/keystore --pk --verbose
-
 # Copy signed Linux EFI executable to EFI partition
 sudo mkdir -pv /boot/efi/EFI/Linux
-sudo cp -v build/linux-signed.efi "/boot/efi/EFI/Linux/Pop_OS-${ROOT_UUID}"
+sudo cp -v build/linux-signed.efi "/boot/efi/EFI/Linux/Pop_OS-${ROOT_UUID}.efi"
 
 # Copy signed systemd-boot EFI executable to EFI partition
 sudo mkdir -pv /boot/efi/EFI/BOOT
 sudo cp -v build/systemd-boot-signed.efi /boot/efi/EFI/BOOT/BOOTX64.efi
+
+# Set keys if in setup mode
+if sudo bootctl status | grep 'Setup Mode: setup'
+then
+	# Add key exchange key
+	sudo efi-updatevar -e -f secret/KEK.esl KEK
+
+	# Add db key
+	sudo efi-updatevar -e -f secret/db.esl db
+
+	# Optionally add Microsoft db keys
+	if [ "${MICROSOFT}" == "1" ]
+	then
+		sudo efi-updatevar -a -e -f secret/MS_db.esl db
+	fi
+
+	# Add platform key, which will probably lock other variables
+	sudo efi-updatevar -f secret/PK.auth PK
+fi
