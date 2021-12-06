@@ -126,3 +126,11 @@ then
 	# Add platform key, which will probably lock other variables
 	sudo efi-updatevar -f secret/PK.auth PK
 fi
+
+# Initiate tpm2-totp if not already set up
+if ! sudo tpm2-totp show &>/dev/null
+then
+	sudo tpm2-totp init -l "$(hostname) TPM2-TOTP" -p 0,2,7
+fi
+
+echo "popcorn setup complete - rerun on firmware or kernel updates"
