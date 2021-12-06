@@ -7,7 +7,7 @@ MICROSOFT="0"
 ROOT_UUID="$(findmnt --noheadings --output UUID --mountpoint /)"
 
 # Linux command line
-CMDLINE="root=UUID=${ROOT_UUID} ro quiet loglevel=0 systemd.show_status=false splash"
+CMDLINE="root=UUID=${ROOT_UUID} ro quiet loglevel=0 systemd.show_status=false splash lockdown=integrity"
 
 set -ex
 
@@ -39,7 +39,7 @@ then
 	sudo make install
 	sudo ldconfig
 	sudo update-initramfs -u
-	#TODO: sudo tpm2-totp init?
+	#TODO: sudo tpm2-totp init -p 0,2,7
 
 	popd
 fi
