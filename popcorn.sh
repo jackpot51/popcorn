@@ -11,6 +11,39 @@ CMDLINE="root=UUID=${ROOT_UUID} ro quiet loglevel=0 systemd.show_status=false sp
 
 set -ex
 
+if [ ! -f /etc/initramfs-tools/hooks/tpm2-totp ]
+then
+	git submodule update --init tpm2-totp
+	pushd tpm2-totp
+
+	sudo apt -y install \
+		autoconf \
+		autoconf-archive \
+		automake \
+		build-essential \
+		doxygen \
+		gcc \
+		iproute2 \
+		liboath-dev \
+		libplymouth-dev \
+		libqrencode-dev \
+		libtool \
+		libtss2-dev \
+		m4 \
+		pandoc \
+		pkg-config \
+		plymouth
+	./bootstrap
+	./configure --sysconfdir=/etc
+	make
+	sudo make install
+	sudo ldconfig
+	sudo update-initramfs -u
+	#TODO: sudo tpm2-totp init?
+
+	popd
+fi
+
 # Create keys
 if [ ! -d secret ]
 then
