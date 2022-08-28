@@ -1,4 +1,0 @@
-[submodule "tpm2-totp"]
-	path = tpm2-totp
-	url = https://github.com/tpm2-software/tpm2-totp.git
-	branch = master
