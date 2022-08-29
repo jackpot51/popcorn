@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# Add Microsoft keys
-MICROSOFT="1"
+# Add Microsoft db if set
+MICROSOFT_DB="$(realpath data/MS_db.esl)"
 
 # Root device UUID
 ROOT_UUID="$(findmnt --noheadings --output UUID --mountpoint /)"
@@ -9,12 +9,20 @@ ROOT_UUID="$(findmnt --noheadings --output UUID --mountpoint /)"
 # Linux command line
 CMDLINE="root=UUID=${ROOT_UUID} ro quiet loglevel=0 systemd.show_status=false splash lockdown=integrity"
 
+if [ "${EUID}" != "0" ]
+then
+    exec sudo "$0" "$@"
+fi
+
 set -ex
+
+mkdir -p /etc/popcorn
+cd /etc/popcorn
 
 # Create keys
 if [ ! -d secret ]
 then
-	sudo apt-get install -y efitools
+	apt-get install -y efitools
 
 	rm -rf secret.partial
 	mkdir -p secret.partial
@@ -49,29 +57,29 @@ then
 fi
 
 # Copy DB cert and key to kernelstub path
-sudo cp -v secret/db.crt /etc/kernelstub/db.crt
-sudo cp -v secret/db.key /etc/kernelstub/db.key
+cp -v secret/db.crt /etc/kernelstub/db.crt
+cp -v secret/db.key /etc/kernelstub/db.key
 
 # Run kernelstub in unified kernel executable mode
-sudo kernelstub --unified --verbose
+kernelstub --unified --verbose
 
 # Set keys if in setup mode
-if sudo bootctl status | grep 'Setup Mode: setup'
+if bootctl status | grep 'Setup Mode: setup'
 then
-	# Add key exchange key
-	sudo efi-updatevar -e -f secret/KEK.esl KEK
-
 	# Add db key
-	sudo efi-updatevar -e -f secret/db.esl db
+	efi-updatevar -e -f secret/db.esl db
 
 	# Optionally add Microsoft db keys
-	if [ "${MICROSOFT}" == "1" ]
+	if [ -n "${MICROSOFT_DB}" ]
 	then
-		sudo efi-updatevar -a -e -f secret/MS_db.esl db
+		efi-updatevar -a -e -f "${MICROSOFT_DB}" db
 	fi
 
+	# Add key exchange key, which may lock db
+	efi-updatevar -e -f secret/KEK.esl KEK
+
 	# Add platform key, which will probably lock other variables
-	sudo efi-updatevar -f secret/PK.auth PK
+	efi-updatevar -f secret/PK.auth PK
 fi
 
 echo "popcorn setup complete - rerun on firmware or kernel updates"
