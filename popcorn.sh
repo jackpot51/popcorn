@@ -61,7 +61,11 @@ cp -v secret/db.crt /etc/kernelstub/db.crt
 cp -v secret/db.key /etc/kernelstub/db.key
 
 # Run kernelstub in unified kernel executable mode
-kernelstub --unified --verbose
+kernelstub --unified --verbose --force
+
+# Ensure systemd-boot is installed and signed
+mkdir -pv /boot/efi/EFI/BOOT
+sbsign --key secret/db.key --cert secret/db.crt --output /boot/efi/EFI/BOOT/BOOTX64.EFI /usr/lib/systemd/boot/efi/systemd-bootx64.efi
 
 # Set keys if in setup mode
 if bootctl status | grep 'Setup Mode: setup'
